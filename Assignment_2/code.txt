@@ -1,0 +1,255 @@
+let stars = [];
+let simTime;      // simulated time in milliseconds
+let timeSpeed = 1; // speed factor (1 = real time)
+
+function setup() {
+  createCanvas(500, 500);
+  angleMode(RADIANS);
+  frameRate(60);
+  
+  // Initialize simulated time with the current time
+  simTime = Date.now();
+  
+  // Create a "Speed Up" button
+  let btn = createButton("Speed Up");
+  btn.position(10, 10);
+  btn.mousePressed(speedUp);
+  
+  // Pre-generate star positions and sizes for the night sky
+  for (let i = 0; i < 100; i++) {
+    stars.push({
+      x: random(width),
+      y: random(height),
+      size: random(1, 3)
+    });
+  }
+}
+
+function speedUp() {
+  // Only increase timeSpeed if it's less than 1000.
+  if (timeSpeed < 1000) {
+    timeSpeed *= 1000;
+    console.log("Time speed factor:", timeSpeed);
+  }
+  else if (timeSpeed >= 1000 & timeSpeed < 2000) {
+    timeSpeed *= 2;
+    console.log("Time speed factor:", timeSpeed);
+  }
+  else if (timeSpeed >= 2000 & timeSpeed < 3000) {
+    timeSpeed *= 1.5;
+    console.log("Time speed factor:", timeSpeed);
+  }
+}
+
+function draw() {
+  // Update simulated time based on the elapsed time (deltaTime is in milliseconds)
+  simTime += deltaTime * timeSpeed;
+  
+  // Draw the time-based animated background using simTime
+  drawBackground();
+  
+  // Then draw the frameless clock on top using simTime
+  drawClock();
+}
+function getAlpha(timeInHours) {
+  // Models alpha such that:
+  // time = 12 -> alpha = 1,
+  // time = 24 (or 0) -> alpha = 0,
+  // time = 6 or 18 -> alpha = 0.5.
+  return 0.5 - 0.5 * cos(PI * timeInHours / 12);
+}
+
+function drawBackground() {
+  // Use simulated time for day/night decisions.
+  let simDate = new Date(simTime);
+  // Compute fractional hours (e.g., 7.5 for 7:30 AM)
+  let currentTime = simDate.getHours() + simDate.getMinutes()/60 + simDate.getSeconds()/3600;
+  let alpha = getAlpha(currentTime);  // 0 <= alpha <= 1
+  
+  // Define day and night colors for sky.
+  let daySky = color("#FFFAE3");
+  let nightSky = color("#001");
+  // Blend the sky color: when alpha = 1 => day, when alpha = 0 => night.
+  let skyColor = lerpColor(nightSky, daySky, alpha);
+  background(skyColor);
+  
+  // Optionally, draw stars when the sky is mostly night (alpha < 0.5).
+  if (alpha < 0.5) {
+    noStroke();
+    fill(255);
+    for (let i = 0; i < stars.length; i++) {
+      let star = stars[i];
+      ellipse(star.x, star.y, star.size, star.size);
+    }
+  }
+  
+  // Ground (curved arc) parameters.
+  let arcCenterX = width / 2;
+  let arcCenterY = height + 100;
+  let arcW = width * 2;
+  let arcH = height * 1.3;
+  
+  // Define day and night colors for the ground.
+  let dayGround = color("#FEEBCB");
+  let nightGround = color("#333");
+  // Blend the ground color in the same way.
+  let groundColor = lerpColor(nightGround, dayGround, alpha);
+  
+  noStroke();
+  fill(groundColor);
+  arc(arcCenterX, arcCenterY, arcW, arcH, PI, TWO_PI, CHORD);
+  
+  // Compute the celestial object's position along the arc.
+  let theta;
+  if (currentTime >= 6 && currentTime < 18) {
+    // For day: normalize time: 6:00 becomes 0 and 18:00 becomes 12.
+    let fraction = (currentTime - 6) / 12;
+    theta = PI + fraction * PI;
+  } else {
+    // For night: if currentTime is 18 or later, subtract 18; if before 6, add 6.
+    let nightHour = currentTime >= 18 ? currentTime - 18 : currentTime + 6;
+    let fraction = nightHour / 12;
+    theta = PI + fraction * PI;
+  }
+  
+  // Compute the position along the arc.
+  let posX = arcCenterX + (arcW / 2) * cos(theta);
+  let posY = arcCenterY + (arcH / 2) * sin(theta);
+  let offsetY = 250;
+  posY -= offsetY;
+  
+  // Draw the celestial object.
+  if (currentTime >= 6 && currentTime < 18) {
+    // Day: draw the sun.
+    fill('#FFD700');
+    noStroke();
+    ellipse(posX, posY, 150, 150);
+  } else {
+    // Night: draw a crescent moon.
+    fill('#F0EDEE');
+    noStroke();
+    ellipse(posX, posY, 150, 150);
+    fill('#001');
+    ellipse(posX - 40, posY, 150, 150);
+  }
+}
+
+
+function drawDial() {
+  push();
+  translate(width / 2, height / 2);
+  
+  let dialRadius = min(width, height) * 0.4;
+  
+  // Determine the current time to decide dial color.
+  let simDate = new Date(simTime);
+  let currentHour = simDate.getHours();
+  let currentMin = simDate.getMinutes();
+  let currentSec = simDate.getSeconds();
+  let isDay = (currentHour >= 6 && currentHour < 18);
+  
+  // Dark blue for morning/day, light gray for night.
+  let currentTime = simDate.getHours() + simDate.getMinutes()/60 + simDate.getSeconds()/3600;
+  let alpha = getAlpha(currentTime);  // 0 <= alpha <= 1
+  let day_color = "#003366"
+  let night_color = "#D3D3D3"
+  let dialColor = lerpColor(night_color, day_color, alpha);
+
+  // --- Draw the 60 tick marks ---
+  for (let i = 0; i < 60; i++) {
+    push();
+    // Rotate so 0 starts at 12 o'clock (subtract HALF_PI)
+    let angle = map(i, 0, 60, 0, TWO_PI) - HALF_PI;
+    rotate(angle);
+    
+    // Decide if it's an hour mark (larger) or a minute mark (smaller)
+    if (i % 5 === 0) {
+      // Hour mark (e.g., 0,5,10... i.e., multiples of 5)
+      fill(dialColor);
+      noStroke();
+      rectMode(CENTER);
+      // Rect is drawn at the edge of the dial
+      // Using negative y to place it "up" from the center
+      rect(0, -dialRadius, 6, 14);
+    } else {
+      // Minute mark
+      fill(dialColor);
+      noStroke();
+      rectMode(CENTER);
+      rect(0, -dialRadius, 4, 10);
+    }
+    pop();
+  }
+
+  // --- Draw the numbers (1 through 12) ---
+  textAlign(CENTER, CENTER);
+  textSize(30);
+  textFont("Helvetica");
+  fill(dialColor);
+  noStroke();
+  for (let n = 1; n <= 12; n++) {
+    push();
+    let angle = map(n % 12, 0, 12, 0, TWO_PI) - HALF_PI;
+    // Position the numbers a bit inside the tick marks
+    let x = (dialRadius * 0.78) * cos(angle);
+    let y = (dialRadius * 0.78) * sin(angle);
+    translate(x, y);
+    text(n, 0, 0);
+    pop();
+  }
+
+  pop();
+}
+
+
+function drawClock() {
+  // Use simulated time for the clock.
+  let simDate = new Date(simTime);
+  let h = simDate.getHours() % 12; // 12-hour format.
+  let m = simDate.getMinutes();
+  let s = simDate.getSeconds();
+  let ms = simDate.getMilliseconds();
+  let currentHour = simDate.getHours();
+  
+  // Compute current time in fractional hours.
+  let currentTime = simDate.getHours() + simDate.getMinutes()/60 + simDate.getSeconds()/3600;
+  // Get blend factor (alpha) for day/night colors.
+  let armAlpha = getAlpha(currentTime);  // 0 <= armAlpha <= 1
+  
+  // Define the colors for the arms.
+  let dayArm = color(0);    // dark (black) for day
+  let nightArm = color(255); // light (white) for night
+  // Blend: when armAlpha = 1 -> dayArm, when armAlpha = 0 -> nightArm.
+  let armColor = lerpColor(nightArm, dayArm, armAlpha);
+  
+  // Calculate angles for hour, minute, and second hands (starting from top).
+  let hourAngle = map(h + m / 60, 0, 12, 0, TWO_PI) - HALF_PI;
+  let minuteAngle = map(m + s / 60, 0, 60, 0, TWO_PI) - HALF_PI;
+  let secondAngle = map(s + ms / 1000, 0, 60, 0, TWO_PI) - HALF_PI;
+  
+  // Draw the dial (optional numbers and markings).
+  drawDial();
+  
+  push();
+  translate(width / 2, height / 2);
+  strokeCap(ROUND);
+  
+  // Draw the hour hand.
+  stroke(armColor);
+  strokeWeight(6);
+  let hrLength = min(width, height) * 0.15;
+  line(0, 0, hrLength * cos(hourAngle), hrLength * sin(hourAngle));
+  
+  // Draw the minute hand.
+  stroke(armColor);
+  strokeWeight(4);
+  let minLength = min(width, height) * 0.25;
+  line(0, 0, minLength * cos(minuteAngle), minLength * sin(minuteAngle));
+  
+  // Draw the second hand in red.
+  stroke(255, 0, 0);
+  strokeWeight(2);
+  let secLength = min(width, height) * 0.2;
+  line(0, 0, secLength * cos(secondAngle), secLength * sin(secondAngle));
+  pop();
+}
