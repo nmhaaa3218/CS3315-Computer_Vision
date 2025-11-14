@@ -1,7 +1,7 @@
 # Computer Vision Assignments Portfolio
 **Student:** Manh Ha Nguyen (a1840406)  
 **Course:** CS3315 - Computer Vision  
-**University:** University of Auckland  
+**University:** University of Adelaide  
 
 This repository contains three comprehensive assignments covering fundamental to advanced computer vision concepts, from basic image processing to deep learning applications.
 
